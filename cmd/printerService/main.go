@@ -2,93 +2,114 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
-	"time"
 
-	"printerService/internal/config"
-	"printerService/internal/printers"
-	"printerService/internal/raw"
-	"printerService/internal/spooler"
-	"printerService/internal/tasks"
-	"printerService/internal/web"
+	"printerService/internal/app"
+	"printerService/internal/winservice"
 )
 
+type command string
+
+const (
+	commandRun       command = "run"
+	commandInstall   command = "install"
+	commandUninstall command = "uninstall"
+	commandStart     command = "start"
+	commandStop      command = "stop"
+	commandService   command = "service"
+)
+
+type cliOptions struct {
+	command    command
+	configPath string
+}
+
 func main() {
-	cfgPath := flag.String("config", defaultConfigPath(), "config file path")
-	flag.Parse()
-
-	cfg, err := config.Load(*cfgPath)
+	opts, err := parseCLI(os.Args[1:], defaultConfigPath())
 	if err != nil {
-		log.Fatalf("load config: %v", err)
-	}
-	if err := config.Save(*cfgPath, cfg); err != nil {
-		log.Printf("save default config: %v", err)
+		log.Fatal(err)
 	}
 
-	taskStore := tasks.NewStore(50)
-	source := printers.WindowsSource{}
-	webHandler := web.NewServer(web.Options{
-		Config: cfg,
-		Source: source,
-		Tasks:  taskStore,
-		Save: func(next config.Config) error {
-			return config.Save(*cfgPath, next)
-		},
-	})
-	targetProvider, ok := webHandler.(interface {
-		TargetPrinterName() (string, error)
-	})
-	if !ok {
-		log.Fatal("web handler does not expose target printer provider")
-	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	controlAddr := fmt.Sprintf("%s:%d", cfg.ControlBind, cfg.ControlPort)
-	dataAddr := fmt.Sprintf("%s:%d", cfg.DataBind, cfg.DataPort)
-
-	controlServer := &http.Server{
-		Addr:              controlAddr,
-		Handler:           webHandler,
-		ReadHeaderTimeout: 5 * time.Second,
-	}
-	dataServer := raw.NewServer(dataAddr, targetProvider.TargetPrinterName, spooler.Windows{}).WithTasks(taskStore)
-
-	errs := make(chan error, 2)
-	go func() {
-		log.Printf("control port listening on http://%s", controlAddr)
-		errs <- controlServer.ListenAndServe()
-	}()
-	go func() {
-		ready := make(chan string, 1)
-		go func() {
-			addr := <-ready
-			if addr != "" {
-				log.Printf("printer data port listening on %s", addr)
-			}
-		}()
-		errs <- dataServer.ListenAndServe(ctx, ready)
-	}()
-
-	select {
-	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := controlServer.Shutdown(shutdownCtx); err != nil {
-			log.Printf("control server shutdown: %v", err)
+	switch opts.command {
+	case commandRun:
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		if err := app.Run(ctx, opts.configPath); err != nil {
+			log.Fatal(err)
 		}
-	case err := <-errs:
-		if err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server failed: %v", err)
+	case commandInstall:
+		if err := winservice.Install(os.Args[0], opts.configPath); err != nil {
+			log.Fatal(err)
 		}
+		fmt.Println("printerService installed")
+	case commandUninstall:
+		if err := winservice.Uninstall(); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("printerService uninstalled")
+	case commandStart:
+		if err := winservice.Start(); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("printerService started")
+	case commandStop:
+		if err := winservice.Stop(); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("printerService stopped")
+	case commandService:
+		if err := winservice.Run(opts.configPath, app.Run); err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func parseCLI(args []string, defaultConfigPath string) (cliOptions, error) {
+	opts := cliOptions{
+		command:    commandRun,
+		configPath: defaultConfigPath,
+	}
+	if len(args) > 0 && isCommand(args[0]) {
+		opts.command = command(args[0])
+		args = args[1:]
+	}
+
+	fs := flag.NewFlagSet("printerService", flag.ContinueOnError)
+	fs.StringVar(&opts.configPath, "config", opts.configPath, "config file path")
+	if err := fs.Parse(args); err != nil {
+		return cliOptions{}, err
+	}
+	if fs.NArg() > 0 {
+		return cliOptions{}, fmt.Errorf("unknown command or argument: %s", fs.Arg(0))
+	}
+	if !commandAllowsConfig(opts.command) && opts.configPath != defaultConfigPath {
+		return cliOptions{}, errors.New("-config is only supported for run, install, and service")
+	}
+	return opts, nil
+}
+
+func isCommand(arg string) bool {
+	switch command(arg) {
+	case commandRun, commandInstall, commandUninstall, commandStart, commandStop, commandService:
+		return true
+	default:
+		return false
+	}
+}
+
+func commandAllowsConfig(cmd command) bool {
+	switch cmd {
+	case commandRun, commandInstall, commandService:
+		return true
+	default:
+		return false
 	}
 }
 

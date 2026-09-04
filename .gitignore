@@ -8,6 +8,7 @@
 bin/
 dist/
 build/
+docs/
 
 # Go workspace/cache artifacts
 vendor/

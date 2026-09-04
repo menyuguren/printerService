@@ -13,6 +13,18 @@
 go run ./cmd/printerService
 ```
 
+Windows 服务安装和启动：
+
+```powershell
+.\install-service.bat
+```
+
+Windows 服务停止和卸载：
+
+```powershell
+.\uninstall-service.bat
+```
+
 打开：
 
 ```text
