@@ -12,12 +12,12 @@ import (
 	"syscall"
 	"time"
 
-	"printer-network-service/internal/config"
-	"printer-network-service/internal/printers"
-	"printer-network-service/internal/raw"
-	"printer-network-service/internal/spooler"
-	"printer-network-service/internal/tasks"
-	"printer-network-service/internal/web"
+	"printerService/internal/config"
+	"printerService/internal/printers"
+	"printerService/internal/raw"
+	"printerService/internal/spooler"
+	"printerService/internal/tasks"
+	"printerService/internal/web"
 )
 
 func main() {
@@ -97,5 +97,5 @@ func defaultConfigPath() string {
 	if base == "" {
 		base = "."
 	}
-	return filepath.Join(base, "PrinterNetworkService", "config.json")
+	return filepath.Join(base, "printerService", "config.json")
 }

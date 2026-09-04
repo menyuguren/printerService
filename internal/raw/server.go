@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"printer-network-service/internal/tasks"
+	"printerService/internal/tasks"
 )
 
 type TargetFunc func() (string, error)

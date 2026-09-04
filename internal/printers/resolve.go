@@ -3,7 +3,7 @@ package printers
 import (
 	"errors"
 
-	"printer-network-service/internal/config"
+	"printerService/internal/config"
 )
 
 var ErrNoPrinter = errors.New("no available printer")

@@ -10,7 +10,7 @@
 ## 运行
 
 ```powershell
-go run ./cmd/printer-network-service
+go run ./cmd/printerService
 ```
 
 打开：
@@ -22,13 +22,13 @@ http://127.0.0.1:8080
 配置文件默认保存到：
 
 ```text
-%ProgramData%\PrinterNetworkService\config.json
+%ProgramData%\printerService\config.json
 ```
 
 也可以指定配置文件：
 
 ```powershell
-go run ./cmd/printer-network-service -config .\config.json
+go run ./cmd/printerService -config .\config.json
 ```
 
 ## 打印方式
@@ -44,6 +44,5 @@ go run ./cmd/printer-network-service -config .\config.json
 ## 构建
 
 ```powershell
-go build -o printer-network-service.exe ./cmd/printer-network-service
+go build -o printerService.exe ./cmd/printerService
 ```
-

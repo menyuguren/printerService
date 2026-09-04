@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"printer-network-service/internal/config"
+	"printerService/internal/config"
 )
 
 type fakeSource struct {

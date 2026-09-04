@@ -1,3 +1,3 @@
-module printer-network-service
+module printerService
 
 go 1.25

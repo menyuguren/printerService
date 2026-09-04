@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"printer-network-service/internal/config"
-	"printer-network-service/internal/printers"
-	"printer-network-service/internal/tasks"
+	"printerService/internal/config"
+	"printerService/internal/printers"
+	"printerService/internal/tasks"
 )
 
 type fakePrinterSource struct {
