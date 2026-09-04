@@ -1,0 +1,28 @@
+# Build outputs
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+bin/
+dist/
+build/
+
+# Go workspace/cache artifacts
+vendor/
+go.work
+go.work.sum
+
+# Local configuration and logs
+config.json
+*.log
+logs/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
