@@ -12,19 +12,21 @@ import (
 )
 
 type Options struct {
-	Config config.Config
-	Source printers.Source
-	Tasks  *tasks.Store
-	Save   func(config.Config) error
+	Config         config.Config
+	Source         printers.Source
+	Tasks          *tasks.Store
+	Save           func(config.Config) error
+	OnConfigChange func()
 }
 
 type Server struct {
-	mu     sync.Mutex
-	cfg    config.Config
-	source printers.Source
-	tasks  *tasks.Store
-	save   func(config.Config) error
-	mux    *http.ServeMux
+	mu             sync.Mutex
+	cfg            config.Config
+	source         printers.Source
+	tasks          *tasks.Store
+	save           func(config.Config) error
+	onConfigChange func()
+	mux            *http.ServeMux
 }
 
 type StatusResponse struct {
@@ -40,11 +42,12 @@ func NewServer(opts Options) http.Handler {
 		opts.Tasks = tasks.NewStore(20)
 	}
 	s := &Server{
-		cfg:    opts.Config,
-		source: opts.Source,
-		tasks:  opts.Tasks,
-		save:   opts.Save,
-		mux:    http.NewServeMux(),
+		cfg:            opts.Config,
+		source:         opts.Source,
+		tasks:          opts.Tasks,
+		save:           opts.Save,
+		onConfigChange: opts.OnConfigChange,
+		mux:            http.NewServeMux(),
 	}
 	s.routes()
 	return s
@@ -191,10 +194,15 @@ func (s *Server) configure(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) persist(cfg config.Config) error {
-	if s.save == nil {
-		return nil
+	if s.save != nil {
+		if err := s.save(cfg); err != nil {
+			return err
+		}
 	}
-	return s.save(cfg)
+	if s.onConfigChange != nil {
+		s.onConfigChange()
+	}
+	return nil
 }
 
 func methodNotAllowed(w http.ResponseWriter) {

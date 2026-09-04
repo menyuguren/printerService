@@ -163,3 +163,38 @@ func TestPortConfigurationCanBeSaved(t *testing.T) {
 		t.Fatalf("saved printer = %+v, want Office and UseDefaultPrinter=false", saved)
 	}
 }
+
+func TestConfigSaveTriggersConfigChangeCallback(t *testing.T) {
+	var changes int
+	handler := NewServer(Options{
+		Config: config.Default(),
+		Source: fakePrinterSource{items: []printers.Info{
+			{Name: "Office", IsDefault: true},
+		}},
+		Tasks: tasks.NewStore(5),
+		Save: func(config.Config) error {
+			return nil
+		},
+		OnConfigChange: func() {
+			changes++
+		},
+	})
+
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(`{
+		"control_bind":"127.0.0.1",
+		"control_port":18080,
+		"data_bind":"0.0.0.0",
+		"data_port":19100,
+		"printer_name":"Office",
+		"use_default_printer":false
+	}`))
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want 200: %s", res.Code, res.Body.String())
+	}
+	if changes != 1 {
+		t.Fatalf("config changes = %d, want 1", changes)
+	}
+}

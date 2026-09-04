@@ -127,7 +127,7 @@ type serviceHandler struct {
 	handle     uintptr
 }
 
-func (h *serviceHandler) serviceMain(_ uint32, _ uintptr) {
+func (h *serviceHandler) serviceMain(_ uint32, _ uintptr) uintptr {
 	controlHandler := syscall.NewCallback(func(control uint32) uintptr {
 		select {
 		case h.controls <- control:
@@ -137,14 +137,14 @@ func (h *serviceHandler) serviceMain(_ uint32, _ uintptr) {
 	})
 	name, err := syscall.UTF16PtrFromString(serviceName)
 	if err != nil {
-		return
+		return 0
 	}
 	r1, _, _ := procRegisterServiceCtrlHandlerW.Call(
 		uintptr(unsafe.Pointer(name)),
 		controlHandler,
 	)
 	if r1 == 0 {
-		return
+		return 0
 	}
 	h.handle = r1
 	h.setStatus(serviceStartPending, 0, 10_000)
@@ -170,22 +170,24 @@ func (h *serviceHandler) serviceMain(_ uint32, _ uintptr) {
 				cancel()
 				if err := <-errs; err != nil {
 					h.setStatus(serviceStopped, 1, 0)
-					return
+					return 0
 				}
 				h.setStatus(serviceStopped, 0, 0)
-				return
+				return 0
 			default:
 				h.setStatus(serviceRunning, 0, 0)
 			}
 		case err := <-errs:
 			if err != nil {
 				h.setStatus(serviceStopped, 1, 0)
-				return
+				return 0
 			}
 			h.setStatus(serviceStopped, 0, 0)
-			return
+			return 0
 		}
 	}
+
+	return 0
 }
 
 func (h *serviceHandler) setStatus(state uint32, exitCode uint32, waitHint uint32) {
