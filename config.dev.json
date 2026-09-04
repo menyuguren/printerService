@@ -1,0 +1,9 @@
+{
+  "control_bind": "127.0.0.1",
+  "control_port": 8080,
+  "data_bind": "0.0.0.0",
+  "data_port": 9100,
+  "printer_name": "Microsoft XPS Document Writer",
+  "use_default_printer": false,
+  "log_level": "info"
+}
