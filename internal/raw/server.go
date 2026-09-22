@@ -2,6 +2,8 @@ package raw
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -25,6 +27,7 @@ type Server struct {
 	spooler Spooler
 	tasks   *tasks.Store
 	maxSize int64
+	debug   bool
 	seq     atomic.Uint64
 }
 
@@ -39,6 +42,11 @@ func NewServer(address string, target TargetFunc, spooler Spooler) *Server {
 
 func (s *Server) WithTasks(store *tasks.Store) *Server {
 	s.tasks = store
+	return s
+}
+
+func (s *Server) WithDebug(debug bool) *Server {
+	s.debug = debug
 	return s
 }
 
@@ -78,19 +86,32 @@ func (s *Server) ListenAndServe(ctx context.Context, ready chan<- string) error 
 }
 
 func (s *Server) handle(ctx context.Context, conn net.Conn) {
-	defer conn.Close()
+	sourceIP := remoteIP(conn.RemoteAddr())
+	defer func() {
+		_ = conn.Close()
+		if s.debug {
+			log.Printf("debug print connection closed from %s", sourceIP)
+		}
+	}()
+
+	if s.debug {
+		log.Printf("debug print connection accepted from %s", sourceIP)
+	}
 
 	printer, err := s.target()
 	if err != nil {
-		log.Printf("resolve target printer failed: %v", err)
+		log.Printf("resolve target printer failed from %s: %v", sourceIP, err)
 		return
+	}
+	if s.debug {
+		log.Printf("debug print target resolved from %s to %q", sourceIP, printer)
 	}
 
 	data, err := io.ReadAll(io.LimitReader(conn, s.maxSize+1))
 	id := s.nextID()
 	task := tasks.Task{
 		ID:        id,
-		SourceIP:  remoteIP(conn.RemoteAddr()),
+		SourceIP:  sourceIP,
 		Printer:   printer,
 		Size:      int64(len(data)),
 		Status:    tasks.StatusReceived,
@@ -104,6 +125,11 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 		s.fail(id, fmt.Errorf("read print data: %w", err))
 		return
 	}
+	if s.debug {
+		fingerprint := payloadFingerprint(data)
+		log.Printf("debug print job %s received from %s: bytes=%d sha256=%s preview=%s",
+			id, sourceIP, len(data), fingerprint.Digest, fingerprint.Preview)
+	}
 	if int64(len(data)) > s.maxSize {
 		s.fail(id, fmt.Errorf("print job exceeds max size %d bytes", s.maxSize))
 		return
@@ -116,7 +142,24 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	if s.tasks != nil {
 		s.tasks.Update(id, tasks.StatusSubmitted, "")
 	}
-	log.Printf("submitted print job %s to %q, %d bytes", id, printer, len(data))
+	log.Printf("submitted print job %s to %q as RAW, %d bytes", id, printer, len(data))
+}
+
+type PayloadFingerprint struct {
+	Digest  string
+	Preview string
+}
+
+func payloadFingerprint(data []byte) PayloadFingerprint {
+	sum := sha256.Sum256(data)
+	previewLength := len(data)
+	if previewLength > 32 {
+		previewLength = 32
+	}
+	return PayloadFingerprint{
+		Digest:  hex.EncodeToString(sum[:]),
+		Preview: hex.EncodeToString(data[:previewLength]),
+	}
 }
 
 func (s *Server) fail(id string, err error) {

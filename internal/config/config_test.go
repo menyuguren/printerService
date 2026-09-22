@@ -54,3 +54,21 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 		t.Fatalf("saved config is not readable: %v", err)
 	}
 }
+
+func TestValidateRejectsUnknownLogLevel(t *testing.T) {
+	cfg := Default()
+	cfg.LogLevel = "trace"
+
+	if err := Validate(cfg); err == nil {
+		t.Fatal("Validate accepted unknown log level")
+	}
+}
+
+func TestValidateAcceptsDebugLogLevel(t *testing.T) {
+	cfg := Default()
+	cfg.LogLevel = "debug"
+
+	if err := Validate(cfg); err != nil {
+		t.Fatalf("Validate(debug) returned error: %v", err)
+	}
+}

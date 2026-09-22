@@ -4,7 +4,7 @@ package spooler
 
 import "runtime"
 
-func submitRaw(string, []byte) error {
+func submitRaw(string, []byte, bool) error {
 	return unsupportedPlatformError(runtime.GOOS)
 }
 

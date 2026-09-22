@@ -7,6 +7,19 @@ import (
 	"time"
 )
 
+func TestPayloadFingerprintUsesDigestAndBoundedPreview(t *testing.T) {
+	data := []byte("abcdef")
+
+	got := payloadFingerprint(data)
+
+	if got.Digest != "bef57ec7f53a6d40beb640a780a639c83bc29ac8a9816f1fc6c5c6dcd93c4721" {
+		t.Fatalf("digest = %q, want SHA-256 digest", got.Digest)
+	}
+	if got.Preview != "616263646566" {
+		t.Fatalf("preview = %q, want hex payload preview", got.Preview)
+	}
+}
+
 type captureSpooler struct {
 	printer string
 	data    []byte

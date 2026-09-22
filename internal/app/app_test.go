@@ -43,9 +43,11 @@ func TestRunAppliesSavedConfigByRestartingListeners(t *testing.T) {
 	next := cfg
 	next.ControlPort = secondControlPort
 	next.DataPort = secondDataPort
+	next.LogLevel = config.LogLevelDebug
 	putConfig(t, firstControlPort, next)
 
 	waitForStatus(t, secondControlPort, secondDataPort)
+	waitForLogLevel(t, secondControlPort, config.LogLevelDebug)
 
 	cancel()
 	select {
@@ -56,6 +58,39 @@ func TestRunAppliesSavedConfigByRestartingListeners(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Run did not stop after context cancellation")
 	}
+}
+
+func waitForLogLevel(t *testing.T, port int, want string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	url := fmt.Sprintf("http://127.0.0.1:%d/api/status", port)
+	client := &http.Client{Timeout: 250 * time.Millisecond}
+	var lastErr error
+
+	for time.Now().Before(deadline) {
+		resp, err := client.Get(url)
+		if err != nil {
+			lastErr = err
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		var body struct {
+			Config config.Config `json:"config"`
+		}
+		err = json.NewDecoder(resp.Body).Decode(&body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = err
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		if resp.StatusCode == http.StatusOK && body.Config.LogLevel == want {
+			return
+		}
+		lastErr = fmt.Errorf("status code %d with log level %q", resp.StatusCode, body.Config.LogLevel)
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("status on port %d did not report log level %q: %v", port, want, lastErr)
 }
 
 func freeTCPPort(t *testing.T) int {

@@ -18,6 +18,11 @@ type Config struct {
 	LogLevel          string `json:"log_level"`
 }
 
+const (
+	LogLevelInfo  = "info"
+	LogLevelDebug = "debug"
+)
+
 func Default() Config {
 	return Config{
 		ControlBind:       "127.0.0.1",
@@ -25,7 +30,7 @@ func Default() Config {
 		DataBind:          "0.0.0.0",
 		DataPort:          9100,
 		UseDefaultPrinter: true,
-		LogLevel:          "info",
+		LogLevel:          LogLevelInfo,
 	}
 }
 
@@ -77,6 +82,9 @@ func Validate(cfg Config) error {
 	}
 	if cfg.ControlBind == cfg.DataBind && cfg.ControlPort == cfg.DataPort {
 		return errors.New("control port and data port must differ")
+	}
+	if cfg.LogLevel != "" && cfg.LogLevel != LogLevelInfo && cfg.LogLevel != LogLevelDebug {
+		return errors.New("invalid log level: must be info or debug")
 	}
 	return nil
 }

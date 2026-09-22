@@ -58,6 +58,12 @@ func TestIndexUsesEventBoundPrinterButtons(t *testing.T) {
 	if !strings.Contains(body, `id="control-port"`) || !strings.Contains(body, `id="data-port"`) {
 		t.Fatal("index does not include port configuration controls")
 	}
+	if !strings.Contains(body, `id="log-level"`) {
+		t.Fatal("index does not include log level configuration control")
+	}
+	if !strings.Contains(body, `document.getElementById('log-level').value`) {
+		t.Fatal("index does not submit the selected log level")
+	}
 }
 
 func TestStatusUsesDefaultPrinterWhenNoPrinterConfigured(t *testing.T) {
@@ -161,6 +167,39 @@ func TestPortConfigurationCanBeSaved(t *testing.T) {
 	}
 	if saved.PrinterName != "Office" || saved.UseDefaultPrinter {
 		t.Fatalf("saved printer = %+v, want Office and UseDefaultPrinter=false", saved)
+	}
+}
+
+func TestLogLevelConfigurationCanBeSaved(t *testing.T) {
+	var saved config.Config
+	handler := NewServer(Options{
+		Config: config.Default(),
+		Source: fakePrinterSource{items: []printers.Info{
+			{Name: "Office", IsDefault: true},
+		}},
+		Tasks: tasks.NewStore(5),
+		Save: func(cfg config.Config) error {
+			saved = cfg
+			return nil
+		},
+	})
+
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(`{
+		"control_bind":"127.0.0.1",
+		"control_port":18080,
+		"data_bind":"0.0.0.0",
+		"data_port":19100,
+		"use_default_printer":true,
+		"log_level":"debug"
+	}`))
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want 200: %s", res.Code, res.Body.String())
+	}
+	if saved.LogLevel != "debug" {
+		t.Fatalf("saved log level = %q, want debug", saved.LogLevel)
 	}
 }
 

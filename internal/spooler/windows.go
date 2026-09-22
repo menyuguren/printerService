@@ -4,6 +4,8 @@ package spooler
 
 import (
 	"fmt"
+	"log"
+	"os/user"
 	"syscall"
 	"unsafe"
 )
@@ -25,7 +27,7 @@ type docInfo1 struct {
 	dataType   uintptr
 }
 
-func submitRaw(printer string, data []byte) error {
+func submitRaw(printer string, data []byte, debug bool) (submitErr error) {
 	if printer == "" {
 		return fmt.Errorf("printer name is empty")
 	}
@@ -41,9 +43,14 @@ func submitRaw(printer string, data []byte) error {
 		0,
 	)
 	if r1 == 0 {
-		return fmt.Errorf("OpenPrinterW %q: %w", printer, err)
+		return fmt.Errorf("OpenPrinterW %q: %w", printer, win32CallError(err))
 	}
-	defer procClosePrinter.Call(handle)
+	if debug {
+		log.Printf("debug spooler OpenPrinter succeeded: printer=%q", printer)
+		if current, userErr := user.Current(); userErr == nil {
+			log.Printf("debug spooler execution user: %s", current.Username)
+		}
+	}
 
 	docName, _ := syscall.UTF16PtrFromString("network print job")
 	dataType, _ := syscall.UTF16PtrFromString("RAW")
@@ -52,21 +59,65 @@ func submitRaw(printer string, data []byte) error {
 		dataType: uintptr(unsafe.Pointer(dataType)),
 	}
 
+	var jobID uint32
+	docStarted := false
+	pageStarted := false
+	defer func() {
+		if pageStarted {
+			r, _, endErr := procEndPage.Call(handle)
+			if debug {
+				log.Printf("debug spooler EndPagePrinter: printer=%q job_id=%d success=%t",
+					printer, jobID, r != 0)
+			}
+			if r == 0 && submitErr == nil {
+				submitErr = stageError("EndPagePrinter", jobID, win32CallError(endErr))
+			}
+		}
+		if docStarted {
+			r, _, endErr := procEndDocPrinter.Call(handle)
+			if debug {
+				log.Printf("debug spooler EndDocPrinter: printer=%q job_id=%d success=%t",
+					printer, jobID, r != 0)
+			}
+			if r == 0 && submitErr == nil {
+				submitErr = stageError("EndDocPrinter", jobID, win32CallError(endErr))
+			}
+		}
+		r, _, closeErr := procClosePrinter.Call(handle)
+		if debug {
+			log.Printf("debug spooler ClosePrinter: printer=%q job_id=%d success=%t",
+				printer, jobID, r != 0)
+		}
+		if r == 0 && submitErr == nil {
+			submitErr = stageError("ClosePrinter", jobID, win32CallError(closeErr))
+		}
+	}()
+
 	r1, _, err = procStartDocPrinter.Call(
 		handle,
 		1,
 		uintptr(unsafe.Pointer(&doc)),
 	)
 	if r1 == 0 {
-		return fmt.Errorf("StartDocPrinterW: %w", err)
+		return fmt.Errorf("StartDocPrinterW %q datatype RAW: %w",
+			printer, win32CallError(err))
 	}
-	defer procEndDocPrinter.Call(handle)
+	jobID = uint32(r1)
+	docStarted = true
+	if debug {
+		log.Printf("debug spooler StartDocPrinter succeeded: printer=%q job_id=%d datatype=RAW",
+			printer, jobID)
+	}
 
 	r1, _, err = procStartPage.Call(handle)
 	if r1 == 0 {
-		return fmt.Errorf("StartPagePrinter: %w", err)
+		return fmt.Errorf("StartPagePrinter %q: %w", printer, win32CallError(err))
 	}
-	defer procEndPage.Call(handle)
+	pageStarted = true
+	if debug {
+		log.Printf("debug spooler StartPagePrinter succeeded: printer=%q job_id=%d",
+			printer, jobID)
+	}
 
 	if len(data) == 0 {
 		return nil
@@ -79,10 +130,26 @@ func submitRaw(printer string, data []byte) error {
 		uintptr(unsafe.Pointer(&written)),
 	)
 	if r1 == 0 {
-		return fmt.Errorf("WritePrinter: %w", err)
+		return fmt.Errorf("WritePrinter %q datatype RAW: %w",
+			printer, win32CallError(err))
 	}
 	if written != uint32(len(data)) {
 		return fmt.Errorf("WritePrinter wrote %d of %d bytes", written, len(data))
 	}
+	if debug {
+		log.Printf("debug spooler WritePrinter succeeded: printer=%q job_id=%d bytes=%d",
+			printer, jobID, written)
+	}
 	return nil
+}
+
+func win32CallError(err error) error {
+	if err != nil && err != syscall.Errno(0) {
+		return err
+	}
+	last := syscall.GetLastError()
+	if last != nil {
+		return last
+	}
+	return syscall.Errno(0)
 }

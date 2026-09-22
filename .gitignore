@@ -11,6 +11,7 @@ build/
 docs/
 
 # Go workspace/cache artifacts
+.gocache/
 vendor/
 go.work
 go.work.sum

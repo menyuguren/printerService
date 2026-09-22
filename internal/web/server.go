@@ -277,6 +277,13 @@ var indexTemplate = template.Must(template.New("index").Parse(`<!doctype html>
         <input id="printer-mode" readonly>
       </div>
       <div>
+        <label for="log-level">日志模式</label>
+        <select id="log-level">
+          <option value="info">生产模式（info）</option>
+          <option value="debug">调试模式（debug）</option>
+        </select>
+      </div>
+      <div>
         <label for="control-bind">控制端口绑定地址</label>
         <input id="control-bind" autocomplete="off">
       </div>
@@ -358,6 +365,7 @@ function renderForm(status, printers) {
   document.getElementById('data-bind').value = config.data_bind || '0.0.0.0';
   document.getElementById('data-port').value = config.data_port || 9100;
   document.getElementById('printer-mode').value = targetModeText(status.target_mode);
+  document.getElementById('log-level').value = config.log_level || 'info';
 
   const selected = config.use_default_printer ? '__default__' : config.printer_name;
   const options = ['<option value="__default__">使用系统默认打印机</option>'].concat((printers || []).map(printer => {
@@ -401,7 +409,7 @@ async function saveConfig() {
     data_port: numberValue('data-port'),
     printer_name: selectedPrinter === '__default__' ? '' : selectedPrinter,
     use_default_printer: selectedPrinter === '__default__',
-    log_level: currentStatus && currentStatus.config.log_level ? currentStatus.config.log_level : 'info'
+    log_level: document.getElementById('log-level').value || 'info'
   };
   await requestJSON('/api/config', {
     method: 'PUT',

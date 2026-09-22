@@ -83,7 +83,10 @@ func runOnce(
 		Handler:           webHandler,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	dataServer := raw.NewServer(dataAddr, targetProvider.TargetPrinterName, spooler.Windows{}).WithTasks(taskStore)
+	debug := cfg.LogLevel == config.LogLevelDebug
+	dataServer := raw.NewServer(dataAddr, targetProvider.TargetPrinterName, spooler.Windows{Debug: debug}).
+		WithTasks(taskStore).
+		WithDebug(debug)
 
 	errs := make(chan serverResult, 2)
 	go func() {

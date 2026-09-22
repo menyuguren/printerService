@@ -58,3 +58,12 @@ go run ./cmd/printerService -config .\config.json
 ```powershell
 go build -o printerService.exe ./cmd/printerService
 ```
+
+## 日志模式
+
+可以在 Web 控制页面中切换日志模式：
+
+- `info`：生产模式，只记录任务、打印机、数据大小和错误信息。
+- `debug`：调试模式，额外记录连接生命周期、数据 SHA-256、有限数据特征、Windows 打印 Job ID 以及各个打印 API 阶段。
+
+调试模式不会记录打印正文。保存配置后服务会自动重载。
