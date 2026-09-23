@@ -65,7 +65,7 @@ func main() {
 		}
 		fmt.Println("printerService stopped")
 	case commandService:
-		if err := winservice.Run(opts.configPath, app.Run); err != nil {
+		if err := winservice.Run(opts.configPath, app.RunService); err != nil {
 			log.Fatal(err)
 		}
 	}

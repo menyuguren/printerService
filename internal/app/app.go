@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"printerService/internal/config"
+	"printerService/internal/logging"
 	"printerService/internal/printers"
 	"printerService/internal/raw"
 	"printerService/internal/spooler"
@@ -20,6 +21,20 @@ type serverResult struct {
 }
 
 func Run(ctx context.Context, cfgPath string) error {
+	return run(ctx, cfgPath, false)
+}
+
+func RunService(ctx context.Context, cfgPath string) error {
+	return run(ctx, cfgPath, true)
+}
+
+func run(ctx context.Context, cfgPath string, serviceMode bool) error {
+	defer func() {
+		if err := logging.Close(); err != nil {
+			log.Printf("close logging failed: %v", err)
+		}
+	}()
+
 	taskStore := tasks.NewStore(50)
 	source := printers.WindowsSource{}
 	restarts := make(chan struct{}, 1)
@@ -31,7 +46,7 @@ func Run(ctx context.Context, cfgPath string) error {
 	}
 
 	for {
-		restart, err := runOnce(ctx, cfgPath, taskStore, source, restarts, notifyRestart)
+		restart, err := runOnce(ctx, cfgPath, taskStore, source, restarts, notifyRestart, serviceMode)
 		if err != nil {
 			return err
 		}
@@ -49,6 +64,7 @@ func runOnce(
 	source printers.Source,
 	restarts <-chan struct{},
 	notifyRestart func(),
+	serviceMode bool,
 ) (bool, error) {
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
@@ -57,6 +73,20 @@ func runOnce(
 	if err := config.Save(cfgPath, cfg); err != nil {
 		log.Printf("save default config: %v", err)
 	}
+	if err := logging.Configure(serviceMode, cfg.LogLevel); err != nil {
+		return false, fmt.Errorf("configure logging: %w", err)
+	}
+	log.Printf("service generation starting: service_mode=%t log_level=%s config=%q control=%s:%d data=%s:%d printer=%q use_default_printer=%t",
+		serviceMode,
+		cfg.LogLevel,
+		cfgPath,
+		cfg.ControlBind,
+		cfg.ControlPort,
+		cfg.DataBind,
+		cfg.DataPort,
+		cfg.PrinterName,
+		cfg.UseDefaultPrinter,
+	)
 
 	webHandler := web.NewServer(web.Options{
 		Config:         cfg,

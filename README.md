@@ -67,3 +67,11 @@ go build -o printerService.exe ./cmd/printerService
 - `debug`：调试模式，额外记录连接生命周期、数据 SHA-256、有限数据特征、Windows 打印 Job ID 以及各个打印 API 阶段。
 
 调试模式不会记录打印正文。保存配置后服务会自动重载。
+
+通过 Windows 服务方式运行时，调试日志会追加写入可执行文件所在目录的：
+
+```text
+printerService.log
+```
+
+直接命令行运行时，日志仍输出到当前控制台。

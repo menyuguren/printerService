@@ -8,15 +8,26 @@ import (
 )
 
 func TestPayloadFingerprintUsesDigestAndBoundedPreview(t *testing.T) {
-	data := []byte("abcdef")
+	data := []byte("%PDF-1.7\n%PCLm 1.0\npayload")
 
 	got := payloadFingerprint(data)
 
-	if got.Digest != "bef57ec7f53a6d40beb640a780a639c83bc29ac8a9816f1fc6c5c6dcd93c4721" {
+	if got.Digest != "da8310e8f74c9677070595ffb140f5708728c375308fe439a2c88497584f4bc1" {
 		t.Fatalf("digest = %q, want SHA-256 digest", got.Digest)
 	}
-	if got.Preview != "616263646566" {
+	if got.Preview != "255044462d312e370a2550434c6d20312e300a7061796c6f6164" {
 		t.Fatalf("preview = %q, want hex payload preview", got.Preview)
+	}
+	if got.Format != "PDF/PCLm" {
+		t.Fatalf("format = %q, want PDF/PCLm", got.Format)
+	}
+}
+
+func TestPayloadFingerprintClassifiesZipPayload(t *testing.T) {
+	got := payloadFingerprint([]byte("PK\x03\x04zip-data"))
+
+	if got.Format != "ZIP-container" {
+		t.Fatalf("format = %q, want ZIP-container", got.Format)
 	}
 }
 

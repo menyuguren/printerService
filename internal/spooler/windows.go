@@ -43,6 +43,10 @@ func submitRaw(printer string, data []byte, debug bool) (submitErr error) {
 		0,
 	)
 	if r1 == 0 {
+		if debug {
+			log.Printf("debug spooler OpenPrinter failed: printer=%q error=%v",
+				printer, win32CallError(err))
+		}
 		return fmt.Errorf("OpenPrinterW %q: %w", printer, win32CallError(err))
 	}
 	if debug {
@@ -99,6 +103,10 @@ func submitRaw(printer string, data []byte, debug bool) (submitErr error) {
 		uintptr(unsafe.Pointer(&doc)),
 	)
 	if r1 == 0 {
+		if debug {
+			log.Printf("debug spooler StartDocPrinter failed: printer=%q datatype=RAW error=%v",
+				printer, win32CallError(err))
+		}
 		return fmt.Errorf("StartDocPrinterW %q datatype RAW: %w",
 			printer, win32CallError(err))
 	}
@@ -111,6 +119,10 @@ func submitRaw(printer string, data []byte, debug bool) (submitErr error) {
 
 	r1, _, err = procStartPage.Call(handle)
 	if r1 == 0 {
+		if debug {
+			log.Printf("debug spooler StartPagePrinter failed: printer=%q job_id=%d error=%v",
+				printer, jobID, win32CallError(err))
+		}
 		return fmt.Errorf("StartPagePrinter %q: %w", printer, win32CallError(err))
 	}
 	pageStarted = true
@@ -130,10 +142,18 @@ func submitRaw(printer string, data []byte, debug bool) (submitErr error) {
 		uintptr(unsafe.Pointer(&written)),
 	)
 	if r1 == 0 {
+		if debug {
+			log.Printf("debug spooler WritePrinter failed: printer=%q job_id=%d requested_bytes=%d written_bytes=%d error=%v",
+				printer, jobID, len(data), written, win32CallError(err))
+		}
 		return fmt.Errorf("WritePrinter %q datatype RAW: %w",
 			printer, win32CallError(err))
 	}
 	if written != uint32(len(data)) {
+		if debug {
+			log.Printf("debug spooler WritePrinter short write: printer=%q job_id=%d requested_bytes=%d written_bytes=%d",
+				printer, jobID, len(data), written)
+		}
 		return fmt.Errorf("WritePrinter wrote %d of %d bytes", written, len(data))
 	}
 	if debug {
